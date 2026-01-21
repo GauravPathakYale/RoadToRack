@@ -58,6 +58,9 @@ export interface MetricsSummary extends Metrics {
   miss_rate_history: [number, number][];
 }
 
+// Movement strategy types
+export type MovementStrategyType = 'random_walk' | 'directed';
+
 export interface SimulationConfig {
   grid: {
     width: number;
@@ -84,6 +87,7 @@ export interface SimulationConfig {
   };
   duration_hours: number;
   random_seed?: number;
+  movement_strategy: MovementStrategyType;
 }
 
 // Helper functions for real-world unit conversions

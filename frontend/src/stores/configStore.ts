@@ -36,6 +36,7 @@ const defaultConfig: SimulationConfig = {
   },
   duration_hours: 24,
   random_seed: undefined,
+  movement_strategy: 'random_walk',
 };
 
 export const useConfigStore = create<ConfigState>((set) => ({

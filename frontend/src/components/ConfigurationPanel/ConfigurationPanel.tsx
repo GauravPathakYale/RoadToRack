@@ -6,6 +6,7 @@ import {
   calculateRealWorldSpeed,
   calculateRealWorldRange,
   calculateRealWorldChargeTime,
+  MovementStrategyType,
 } from '../../types/simulation';
 
 export function ConfigurationPanel() {
@@ -335,33 +336,53 @@ export function ConfigurationPanel() {
       <div className="mb-4 border-b pb-4">
         <SectionHeader title="Simulation" section="simulation" />
         {expandedSection === 'simulation' && (
-          <div className="grid grid-cols-2 gap-3 mt-2">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Duration (hours)</label>
-              <input
-                type="number"
-                min="1"
-                max="168"
-                value={config.duration_hours}
-                onChange={(e) => updateConfig({ duration_hours: parseFloat(e.target.value) || 24 })}
-                disabled={isRunning}
-                className="w-full px-3 py-2 border rounded-lg text-sm
-                           disabled:bg-gray-100 disabled:cursor-not-allowed"
-              />
+          <div className="space-y-3 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Duration (hours)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="168"
+                  value={config.duration_hours}
+                  onChange={(e) => updateConfig({ duration_hours: parseFloat(e.target.value) || 24 })}
+                  disabled={isRunning}
+                  className="w-full px-3 py-2 border rounded-lg text-sm
+                             disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Random Seed</label>
+                <input
+                  type="number"
+                  value={config.random_seed ?? ''}
+                  onChange={(e) => updateConfig({
+                    random_seed: e.target.value ? parseInt(e.target.value) : undefined
+                  })}
+                  placeholder="Auto"
+                  disabled={isRunning}
+                  className="w-full px-3 py-2 border rounded-lg text-sm
+                             disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+              </div>
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Random Seed</label>
-              <input
-                type="number"
-                value={config.random_seed ?? ''}
-                onChange={(e) => updateConfig({
-                  random_seed: e.target.value ? parseInt(e.target.value) : undefined
-                })}
-                placeholder="Auto"
+              <label className="block text-xs text-gray-500 mb-1">Movement Strategy</label>
+              <select
+                value={config.movement_strategy}
+                onChange={(e) => updateConfig({ movement_strategy: e.target.value as MovementStrategyType })}
                 disabled={isRunning}
                 className="w-full px-3 py-2 border rounded-lg text-sm
                            disabled:bg-gray-100 disabled:cursor-not-allowed"
-              />
+              >
+                <option value="random_walk">Random Walk</option>
+                <option value="directed">Directed (External Control)</option>
+              </select>
+              <span className="text-xs text-gray-400">
+                {config.movement_strategy === 'random_walk'
+                  ? 'Scooters move randomly between neighboring cells'
+                  : 'Scooters receive destinations from external system'}
+              </span>
             </div>
           </div>
         )}

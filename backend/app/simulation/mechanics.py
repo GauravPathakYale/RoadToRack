@@ -51,40 +51,6 @@ def schedule_move(
     return (event, world.current_time + travel_time)
 
 
-def schedule_random_move(
-    scooter: Scooter,
-    world: "WorldState",
-    scheduler: "EventScheduler"
-) -> Tuple["Event", float]:
-    """Schedule next random walk step for a scooter.
-
-    This function is maintained for backward compatibility.
-    New code should use schedule_move() which respects the world's
-    movement strategy.
-
-    Args:
-        scooter: The scooter to schedule a move for
-        world: Current world state
-        scheduler: Event scheduler
-
-    Returns:
-        Tuple of (ScooterMoveEvent, scheduled_time)
-    """
-    from app.simulation.events import ScooterMoveEvent
-    from app.simulation.movement_strategies import RandomWalkStrategy
-
-    # Use RandomWalkStrategy directly for explicit random walk behavior
-    strategy = RandomWalkStrategy()
-    next_pos = strategy.get_next_destination(scooter, world, scheduler)
-
-    # Calculate travel time
-    distance = scooter.position.distance_to(next_pos)
-    travel_time = scooter.travel_time(distance) if distance > 0 else 0.1
-
-    event = ScooterMoveEvent(scooter_id=scooter.id, new_position=next_pos)
-    return (event, world.current_time + travel_time)
-
-
 def schedule_move_toward_station(
     scooter: Scooter,
     world: "WorldState",
