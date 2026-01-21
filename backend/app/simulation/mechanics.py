@@ -1,4 +1,10 @@
-"""Movement, charging, and swapping mechanics for the simulation."""
+"""Movement, charging, and swapping mechanics for the simulation.
+
+This module provides functions for scheduling scooter movements and
+calculating energy consumption. Movement behavior is delegated to
+pluggable strategies via the world's movement_strategy and
+station_seeking_behavior attributes.
+"""
 
 from typing import Tuple, TYPE_CHECKING
 
@@ -7,6 +13,42 @@ from app.models.entities import Position, Scooter, ScooterState
 if TYPE_CHECKING:
     from app.models.entities import WorldState
     from app.simulation.scheduler import EventScheduler
+    from app.simulation.events import Event
+
+
+def schedule_move(
+    scooter: Scooter,
+    world: "WorldState",
+    scheduler: "EventScheduler"
+) -> Tuple["Event", float]:
+    """Schedule next move for a scooter using the world's movement strategy.
+
+    This is the primary entry point for scheduling scooter movement.
+    It delegates destination selection to world.movement_strategy.
+
+    Args:
+        scooter: The scooter to schedule a move for
+        world: Current world state (contains movement_strategy)
+        scheduler: Event scheduler
+
+    Returns:
+        Tuple of (ScooterMoveEvent, scheduled_time)
+    """
+    from app.simulation.events import ScooterMoveEvent
+    from app.simulation.movement_strategies import DEFAULT_MOVEMENT_STRATEGY
+
+    # Use world's strategy or fall back to default
+    strategy = world.movement_strategy or DEFAULT_MOVEMENT_STRATEGY
+
+    # Get next destination from strategy
+    next_pos = strategy.get_next_destination(scooter, world, scheduler)
+
+    # Calculate travel time
+    distance = scooter.position.distance_to(next_pos)
+    travel_time = scooter.travel_time(distance) if distance > 0 else 0.1
+
+    event = ScooterMoveEvent(scooter_id=scooter.id, new_position=next_pos)
+    return (event, world.current_time + travel_time)
 
 
 def schedule_random_move(
@@ -14,18 +56,26 @@ def schedule_random_move(
     world: "WorldState",
     scheduler: "EventScheduler"
 ) -> Tuple["Event", float]:
-    """Schedule next random walk step for a scooter."""
+    """Schedule next random walk step for a scooter.
+
+    This function is maintained for backward compatibility.
+    New code should use schedule_move() which respects the world's
+    movement strategy.
+
+    Args:
+        scooter: The scooter to schedule a move for
+        world: Current world state
+        scheduler: Event scheduler
+
+    Returns:
+        Tuple of (ScooterMoveEvent, scheduled_time)
+    """
     from app.simulation.events import ScooterMoveEvent
+    from app.simulation.movement_strategies import RandomWalkStrategy
 
-    rng = scheduler.get_rng()
-    neighbors = scooter.position.neighbors(world.grid_width, world.grid_height)
-
-    if not neighbors:
-        # Edge case: no valid neighbors (shouldn't happen with proper grid)
-        next_pos = scooter.position
-    else:
-        idx = rng.integers(0, len(neighbors))
-        next_pos = neighbors[idx]
+    # Use RandomWalkStrategy directly for explicit random walk behavior
+    strategy = RandomWalkStrategy()
+    next_pos = strategy.get_next_destination(scooter, world, scheduler)
 
     # Calculate travel time
     distance = scooter.position.distance_to(next_pos)
@@ -40,28 +90,32 @@ def schedule_move_toward_station(
     world: "WorldState",
     scheduler: "EventScheduler"
 ) -> Tuple["Event", float]:
-    """Schedule move toward target station (greedy shortest path)."""
+    """Schedule move toward target station using station-seeking behavior.
+
+    Uses world.station_seeking_behavior for pathfinding toward the
+    scooter's target station. Falls back to greedy behavior if not set.
+
+    Args:
+        scooter: The scooter traveling to a station
+        world: Current world state (contains station_seeking_behavior)
+        scheduler: Event scheduler
+
+    Returns:
+        Tuple of (ScooterMoveEvent, scheduled_time)
+    """
     from app.simulation.events import ScooterMoveEvent
+    from app.simulation.movement_strategies import DEFAULT_STATION_SEEKING_BEHAVIOR
 
     if not scooter.target_position:
-        # No target, schedule random move instead
-        return schedule_random_move(scooter, world, scheduler)
+        # No target, use normal movement strategy
+        return schedule_move(scooter, world, scheduler)
 
-    target = scooter.target_position
-    current = scooter.position
+    # Use world's station seeking behavior or fall back to default
+    behavior = world.station_seeking_behavior or DEFAULT_STATION_SEEKING_BEHAVIOR
 
-    # Simple greedy movement toward target
-    dx = target.x - current.x
-    dy = target.y - current.y
+    next_pos = behavior.get_next_step_toward_station(scooter, world, scheduler)
 
-    if dx != 0:
-        next_pos = Position(current.x + (1 if dx > 0 else -1), current.y)
-    elif dy != 0:
-        next_pos = Position(current.x, current.y + (1 if dy > 0 else -1))
-    else:
-        next_pos = current  # Already at target
-
-    distance = current.distance_to(next_pos)
+    distance = scooter.position.distance_to(next_pos)
     travel_time = scooter.travel_time(distance) if distance > 0 else 0.0
 
     event = ScooterMoveEvent(scooter_id=scooter.id, new_position=next_pos)
@@ -69,7 +123,15 @@ def schedule_move_toward_station(
 
 
 def calculate_energy_consumption(distance: float, consumption_rate: float) -> float:
-    """Calculate energy consumed for traveling a distance."""
+    """Calculate energy consumed for traveling a distance.
+
+    Args:
+        distance: Distance traveled in grid units
+        consumption_rate: Energy consumption rate in kWh per grid unit
+
+    Returns:
+        Energy consumed in kWh
+    """
     return distance * consumption_rate
 
 
@@ -78,7 +140,16 @@ def calculate_charge_time(
     capacity: float,
     charge_rate_kw: float
 ) -> float:
-    """Calculate time in seconds to fully charge a battery."""
+    """Calculate time in seconds to fully charge a battery.
+
+    Args:
+        current_charge: Current charge level in kWh
+        capacity: Battery capacity in kWh
+        charge_rate_kw: Charging rate in kW
+
+    Returns:
+        Time to full charge in seconds
+    """
     remaining = capacity - current_charge
     if remaining <= 0:
         return 0.0
