@@ -7,6 +7,7 @@ import uuid
 
 from app.core.simulation_engine import SimulationEngine, SimulationConfig, SimulationStatus
 from app.models.entities import WorldState
+from app.simulation.movement_strategies import MovementStrategyType
 
 
 class SimulationManager:
@@ -67,6 +68,13 @@ class SimulationManager:
 
     def set_config_from_dict(self, config_dict: dict) -> None:
         """Set configuration from a dictionary."""
+        # Parse movement strategy
+        strategy_str = config_dict.get("movement_strategy", "random_walk")
+        try:
+            movement_strategy = MovementStrategyType(strategy_str)
+        except ValueError:
+            movement_strategy = MovementStrategyType.RANDOM_WALK
+
         config = SimulationConfig(
             grid_width=config_dict.get("grid", {}).get("width", 100),
             grid_height=config_dict.get("grid", {}).get("height", 100),
@@ -83,6 +91,7 @@ class SimulationManager:
             consumption_rate_kwh_per_unit=config_dict.get("scooters", {}).get("battery_spec", {}).get("consumption_rate", 0.001),
             random_seed=config_dict.get("random_seed"),
             station_positions=config_dict.get("stations"),
+            movement_strategy=movement_strategy,
         )
         self.set_config(config)
 
