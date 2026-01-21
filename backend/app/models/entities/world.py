@@ -10,6 +10,7 @@ from .scooter import Scooter
 
 if TYPE_CHECKING:
     from app.simulation.metrics import MetricsCollector
+    from app.simulation.movement_strategies import MovementStrategy, StationSeekingBehavior
 
 
 @dataclass
@@ -29,6 +30,11 @@ class WorldState:
 
     # Metrics collector (set by SimulationEngine)
     metrics: Optional[Any] = None  # Actually MetricsCollector, using Any to avoid circular import
+
+    # Movement strategies (set by SimulationEngine)
+    # Using Any to avoid circular import at runtime
+    movement_strategy: Optional[Any] = None  # Actually MovementStrategy
+    station_seeking_behavior: Optional[Any] = None  # Actually StationSeekingBehavior
 
     def snapshot(self) -> "WorldState":
         """Create a deep copy for visualization/logging."""

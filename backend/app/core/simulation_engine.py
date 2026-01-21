@@ -1,7 +1,7 @@
 """Core simulation engine for battery swap station simulation."""
 
 from dataclasses import dataclass, field
-from typing import Optional, List, Callable, Any
+from typing import Optional, List, Callable, Any, Union
 from enum import Enum, auto
 import asyncio
 
@@ -11,8 +11,16 @@ from app.models.entities import (
 )
 from app.simulation.scheduler import EventScheduler, reset_event_counter
 from app.simulation.events import ScooterMoveEvent, BatteryChargingTickEvent
-from app.simulation.mechanics import schedule_random_move
+from app.simulation.mechanics import schedule_move
 from app.simulation.metrics import MetricsCollector
+from app.simulation.movement_strategies import (
+    MovementStrategy,
+    StationSeekingBehavior,
+    MovementStrategyType,
+    RandomWalkStrategy,
+    GreedyStationSeekingBehavior,
+    create_movement_strategy,
+)
 
 
 class SimulationStatus(Enum):
@@ -56,6 +64,13 @@ class SimulationConfig:
     # Station positions (if None, will be auto-placed)
     station_positions: Optional[List[dict]] = None
 
+    # Movement strategy configuration
+    # Can be a MovementStrategyType string, a MovementStrategy instance, or None (uses default)
+    movement_strategy: Optional[Union[MovementStrategyType, MovementStrategy]] = None
+
+    # Station seeking behavior (if None, uses default greedy behavior)
+    station_seeking_behavior: Optional[StationSeekingBehavior] = None
+
 
 @dataclass
 class SimulationResult:
@@ -82,10 +97,17 @@ class SimulationEngine:
     def __init__(self, config: SimulationConfig):
         self.config = config
         self.metrics = MetricsCollector()
+
+        # Resolve movement strategy
+        movement_strategy = self._resolve_movement_strategy(config.movement_strategy)
+        station_seeking = config.station_seeking_behavior or GreedyStationSeekingBehavior()
+
         self.world = WorldState(
             grid_width=config.grid_width,
             grid_height=config.grid_height,
-            metrics=self.metrics  # Pass metrics to world so events can access it
+            metrics=self.metrics,  # Pass metrics to world so events can access it
+            movement_strategy=movement_strategy,
+            station_seeking_behavior=station_seeking,
         )
         self.scheduler = EventScheduler(
             max_time=config.max_duration_seconds,
@@ -94,6 +116,25 @@ class SimulationEngine:
         self.status = SimulationStatus.IDLE
         self._event_count = 0
         self._observers: List[Callable[[WorldState, Any], None]] = []
+
+    def _resolve_movement_strategy(
+        self,
+        strategy: Optional[Union[MovementStrategyType, MovementStrategy]]
+    ) -> MovementStrategy:
+        """Resolve strategy configuration to a MovementStrategy instance."""
+        if strategy is None:
+            return RandomWalkStrategy()
+        elif isinstance(strategy, MovementStrategy):
+            return strategy
+        elif isinstance(strategy, MovementStrategyType):
+            return create_movement_strategy(strategy)
+        else:
+            # Try to parse as string
+            try:
+                strategy_type = MovementStrategyType(strategy)
+                return create_movement_strategy(strategy_type)
+            except ValueError:
+                raise ValueError(f"Unknown movement strategy: {strategy}")
 
     def initialize(self) -> None:
         """Set up initial world state and events."""
@@ -201,9 +242,14 @@ class SimulationEngine:
 
     def _schedule_initial_events(self) -> None:
         """Schedule initial events to start the simulation."""
-        # Schedule initial moves for all scooters
+        # Schedule initial moves for all scooters using pluggable movement strategy
         for scooter in self.world.scooters.values():
-            event, time = schedule_random_move(scooter, self.world, self.scheduler)
+            # Notify strategy that scooter is starting
+            if self.world.movement_strategy:
+                self.world.movement_strategy.on_scooter_activated(
+                    scooter, self.world, self.scheduler
+                )
+            event, time = schedule_move(scooter, self.world, self.scheduler)
             self.scheduler.schedule(event, time)
 
         # Schedule charging ticks for all stations
@@ -328,10 +374,17 @@ class SimulationEngine:
     def reset(self) -> None:
         """Reset the simulation to initial state."""
         self.metrics.reset()
+
+        # Resolve movement strategy (recreate to reset any internal state)
+        movement_strategy = self._resolve_movement_strategy(self.config.movement_strategy)
+        station_seeking = self.config.station_seeking_behavior or GreedyStationSeekingBehavior()
+
         self.world = WorldState(
             grid_width=self.config.grid_width,
             grid_height=self.config.grid_height,
-            metrics=self.metrics  # Pass metrics to world so events can access it
+            metrics=self.metrics,  # Pass metrics to world so events can access it
+            movement_strategy=movement_strategy,
+            station_seeking_behavior=station_seeking,
         )
         self.scheduler = EventScheduler(
             max_time=self.config.max_duration_seconds,

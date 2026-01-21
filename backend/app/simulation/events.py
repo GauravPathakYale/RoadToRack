@@ -40,7 +40,7 @@ class ScooterMoveEvent(Event):
 
     def process(self, world: "WorldState", scheduler: "EventScheduler") -> List[tuple]:
         from app.simulation.mechanics import (
-            schedule_random_move,
+            schedule_move,
             schedule_move_toward_station,
         )
 
@@ -73,7 +73,8 @@ class ScooterMoveEvent(Event):
 
         # Schedule next move based on state
         if scooter.state == ScooterState.MOVING:
-            event, time = schedule_random_move(scooter, world, scheduler)
+            # Use pluggable movement strategy via schedule_move
+            event, time = schedule_move(scooter, world, scheduler)
             new_events.append((event, time))
 
         elif scooter.state == ScooterState.TRAVELING_TO_STATION:
@@ -152,7 +153,7 @@ class BatterySwapEvent(Event):
     deposit_to_slot: int
 
     def process(self, world: "WorldState", scheduler: "EventScheduler") -> List[tuple]:
-        from app.simulation.mechanics import schedule_random_move
+        from app.simulation.mechanics import schedule_move
 
         scooter = world.get_scooter(self.scooter_id)
         station = world.get_station(self.station_id)
@@ -247,8 +248,12 @@ class BatterySwapEvent(Event):
             )
             new_events.append((event, world.current_time + charge_time))
 
-        # Schedule next scooter move
-        event, time = schedule_random_move(scooter, world, scheduler)
+        # Schedule next scooter move using pluggable movement strategy
+        # Notify strategy that scooter is reactivated after swap
+        if world.movement_strategy:
+            world.movement_strategy.on_scooter_activated(scooter, world, scheduler)
+
+        event, time = schedule_move(scooter, world, scheduler)
         new_events.append((event, time))
 
         return new_events

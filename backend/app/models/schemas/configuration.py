@@ -2,6 +2,13 @@
 
 from pydantic import BaseModel, Field
 from typing import Optional, List
+from enum import Enum
+
+
+class MovementStrategyType(str, Enum):
+    """Available movement strategy types for scooter behavior."""
+    RANDOM_WALK = "random_walk"
+    DIRECTED = "directed"
 
 
 class PositionSchema(BaseModel):
@@ -56,6 +63,10 @@ class SimulationConfigRequest(BaseModel):
     scooters: ScooterConfig = Field(default_factory=ScooterConfig)
     duration_hours: float = Field(default=24.0, gt=0, le=168, description="Simulation duration in hours")
     random_seed: Optional[int] = Field(default=None, description="Random seed for reproducibility")
+    movement_strategy: MovementStrategyType = Field(
+        default=MovementStrategyType.RANDOM_WALK,
+        description="Movement strategy for scooter behavior (random_walk or directed)"
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -75,7 +86,8 @@ class SimulationConfigRequest(BaseModel):
                     }
                 },
                 "duration_hours": 24,
-                "random_seed": 42
+                "random_seed": 42,
+                "movement_strategy": "random_walk"
             }
         }
     }
@@ -91,3 +103,4 @@ class SimulationConfigResponse(BaseModel):
     scooters: ScooterConfig
     duration_hours: float
     random_seed: Optional[int]
+    movement_strategy: MovementStrategyType = MovementStrategyType.RANDOM_WALK
