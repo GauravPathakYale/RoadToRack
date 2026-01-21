@@ -244,11 +244,10 @@ class SimulationEngine:
         """Schedule initial events to start the simulation."""
         # Schedule initial moves for all scooters using pluggable movement strategy
         for scooter in self.world.scooters.values():
-            # Notify strategy that scooter is starting
-            if self.world.movement_strategy:
-                self.world.movement_strategy.on_scooter_activated(
-                    scooter, self.world, self.scheduler
-                )
+            # Notify strategy that scooter is starting (per-scooter takes precedence)
+            strategy = scooter.movement_strategy or self.world.movement_strategy
+            if strategy:
+                strategy.on_scooter_activated(scooter, self.world, self.scheduler)
             event, time = schedule_move(scooter, self.world, self.scheduler)
             self.scheduler.schedule(event, time)
 

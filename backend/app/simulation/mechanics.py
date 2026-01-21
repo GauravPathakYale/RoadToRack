@@ -21,14 +21,14 @@ def schedule_move(
     world: "WorldState",
     scheduler: "EventScheduler"
 ) -> Tuple["Event", float]:
-    """Schedule next move for a scooter using the world's movement strategy.
+    """Schedule next move for a scooter using its movement strategy.
 
     This is the primary entry point for scheduling scooter movement.
-    It delegates destination selection to world.movement_strategy.
+    Strategy precedence: scooter.movement_strategy > world.movement_strategy > default.
 
     Args:
         scooter: The scooter to schedule a move for
-        world: Current world state (contains movement_strategy)
+        world: Current world state (contains fallback movement_strategy)
         scheduler: Event scheduler
 
     Returns:
@@ -37,8 +37,8 @@ def schedule_move(
     from app.simulation.events import ScooterMoveEvent
     from app.simulation.movement_strategies import DEFAULT_MOVEMENT_STRATEGY
 
-    # Use world's strategy or fall back to default
-    strategy = world.movement_strategy or DEFAULT_MOVEMENT_STRATEGY
+    # Per-scooter strategy takes precedence over world strategy
+    strategy = scooter.movement_strategy or world.movement_strategy or DEFAULT_MOVEMENT_STRATEGY
 
     # Get next destination from strategy
     next_pos = strategy.get_next_destination(scooter, world, scheduler)

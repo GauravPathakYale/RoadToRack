@@ -249,9 +249,10 @@ class BatterySwapEvent(Event):
             new_events.append((event, world.current_time + charge_time))
 
         # Schedule next scooter move using pluggable movement strategy
-        # Notify strategy that scooter is reactivated after swap
-        if world.movement_strategy:
-            world.movement_strategy.on_scooter_activated(scooter, world, scheduler)
+        # Notify strategy that scooter is reactivated after swap (per-scooter takes precedence)
+        strategy = scooter.movement_strategy or world.movement_strategy
+        if strategy:
+            strategy.on_scooter_activated(scooter, world, scheduler)
 
         event, time = schedule_move(scooter, world, scheduler)
         new_events.append((event, time))

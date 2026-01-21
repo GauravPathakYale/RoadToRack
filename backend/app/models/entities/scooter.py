@@ -2,9 +2,12 @@
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from .position import Position
+
+if TYPE_CHECKING:
+    from app.simulation.movement_strategies import MovementStrategy
 
 
 class ScooterState(Enum):
@@ -29,6 +32,9 @@ class Scooter:
     # Navigation state
     target_station_id: Optional[str] = None
     target_position: Optional[Position] = None
+
+    # Per-scooter movement strategy (overrides world.movement_strategy if set)
+    movement_strategy: Optional["MovementStrategy"] = None
 
     def needs_swap(self, battery_charge_level: float) -> bool:
         """Check if scooter needs to find a swap station."""
