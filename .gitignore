@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+backend/venv/
+backend/.venv/
+
+# Build outputs
+frontend/dist/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+*.pyo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+.coverage
+htmlcov/
+
+# Temporary files
+tmpclaude-*-cwd/
+nul
+*.tmp
+
+# Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
