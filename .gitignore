@@ -36,8 +36,12 @@ htmlcov/
 
 # Temporary files
 tmpclaude-*-cwd/
+tmpclaude-*
 nul
 *.tmp
+
+# Claude Code
+.claude/
 
 # Python
 *.egg-info/
