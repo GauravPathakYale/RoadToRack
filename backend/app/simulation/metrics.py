@@ -41,6 +41,11 @@ class MetricsCollector:
     swap_events: List[SwapEvent] = field(default_factory=list)
     swaps_per_station: Dict[str, int] = field(default_factory=dict)
 
+    # Per-station miss tracking
+    misses_per_station: Dict[str, int] = field(default_factory=dict)
+    no_battery_misses_per_station: Dict[str, int] = field(default_factory=dict)
+    partial_charge_misses_per_station: Dict[str, int] = field(default_factory=dict)
+
     # Wait time tracking (scooter_id -> start time)
     wait_start_times: Dict[str, float] = field(default_factory=dict)
     wait_durations: List[float] = field(default_factory=list)
@@ -63,6 +68,8 @@ class MetricsCollector:
             station_id=station_id,
             miss_type=MissType.NO_BATTERY
         ))
+        self.misses_per_station[station_id] = self.misses_per_station.get(station_id, 0) + 1
+        self.no_battery_misses_per_station[station_id] = self.no_battery_misses_per_station.get(station_id, 0) + 1
         self.wait_start_times[scooter_id] = time
 
     def record_partial_charge_miss(
@@ -80,6 +87,8 @@ class MetricsCollector:
             miss_type=MissType.PARTIAL_CHARGE,
             charge_level=charge_level
         ))
+        self.misses_per_station[station_id] = self.misses_per_station.get(station_id, 0) + 1
+        self.partial_charge_misses_per_station[station_id] = self.partial_charge_misses_per_station.get(station_id, 0) + 1
 
     def record_swap(
         self,
@@ -176,6 +185,9 @@ class MetricsCollector:
             "max_wait_time": self.max_wait_time,
             "swaps_per_station": dict(self.swaps_per_station),
             "miss_rate_history": self.miss_rate_history,
+            "misses_per_station": dict(self.misses_per_station),
+            "no_battery_misses_per_station": dict(self.no_battery_misses_per_station),
+            "partial_charge_misses_per_station": dict(self.partial_charge_misses_per_station),
         }
 
     def get_current_metrics(self) -> dict:
@@ -186,6 +198,8 @@ class MetricsCollector:
             "miss_rate": self.current_miss_rate,
             "no_battery_misses": self.no_battery_misses,
             "partial_charge_misses": self.partial_charge_misses,
+            "misses_per_station": dict(self.misses_per_station),
+            "swaps_per_station": dict(self.swaps_per_station),
         }
 
     def reset(self) -> None:
@@ -193,6 +207,9 @@ class MetricsCollector:
         self.miss_events.clear()
         self.swap_events.clear()
         self.swaps_per_station.clear()
+        self.misses_per_station.clear()
+        self.no_battery_misses_per_station.clear()
+        self.partial_charge_misses_per_station.clear()
         self.wait_start_times.clear()
         self.wait_durations.clear()
         self.miss_rate_history.clear()

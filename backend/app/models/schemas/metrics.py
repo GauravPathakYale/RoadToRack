@@ -12,6 +12,8 @@ class CurrentMetrics(BaseModel):
     miss_rate: float
     no_battery_misses: int
     partial_charge_misses: int
+    misses_per_station: Dict[str, int] = {}
+    swaps_per_station: Dict[str, int] = {}
 
 
 class MetricsSummary(BaseModel):
@@ -27,3 +29,6 @@ class MetricsSummary(BaseModel):
     max_wait_time: float
     swaps_per_station: Dict[str, int]
     miss_rate_history: List[Tuple[float, float]]
+    misses_per_station: Dict[str, int] = {}
+    no_battery_misses_per_station: Dict[str, int] = {}
+    partial_charge_misses_per_station: Dict[str, int] = {}

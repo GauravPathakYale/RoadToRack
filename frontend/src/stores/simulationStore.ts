@@ -36,6 +36,8 @@ const initialMetrics: Metrics = {
   miss_rate: 0,
   no_battery_misses: 0,
   partial_charge_misses: 0,
+  misses_per_station: {},
+  swaps_per_station: {},
 };
 
 export const useSimulationStore = create<SimulationState>((set) => ({

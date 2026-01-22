@@ -6,6 +6,29 @@ function formatTime(seconds: number): string {
   return `${hours}h ${minutes}m`;
 }
 
+function getStationMissRate(
+  stationId: string,
+  misses: Record<string, number>,
+  swaps: Record<string, number>
+): number {
+  const m = misses[stationId] ?? 0;
+  const s = swaps[stationId] ?? 0;
+  const total = m + s;
+  return total === 0 ? 0 : m / total;
+}
+
+function getMissRateColor(rate: number): string {
+  if (rate <= 0.10) return 'bg-green-500';
+  if (rate <= 0.20) return 'bg-yellow-500';
+  return 'bg-red-500';
+}
+
+function getMissRateTextColor(rate: number): string {
+  if (rate <= 0.10) return 'text-green-600';
+  if (rate <= 0.20) return 'text-yellow-600';
+  return 'text-red-600';
+}
+
 export function MetricsDashboard() {
   const { simulationTime, tick, metrics, scooters, stations } = useSimulationStore();
 
@@ -126,29 +149,38 @@ export function MetricsDashboard() {
       {/* Station details */}
       <div>
         <h3 className="text-sm font-medium text-gray-700 mb-2">Stations</h3>
-        <div className="space-y-2 max-h-40 overflow-y-auto">
-          {stations.map((station) => (
-            <div
-              key={station.id}
-              className="flex items-center justify-between bg-gray-50 rounded p-2 text-sm"
-            >
-              <span className="text-gray-600">{station.id}</span>
-              <div className="flex items-center gap-2">
-                <span className="font-medium">
-                  {station.full_batteries}/{station.num_slots}
+        <div className="space-y-2 max-h-48 overflow-y-auto">
+          {stations.map((station) => {
+            const missRate = getStationMissRate(
+              station.id,
+              metrics.misses_per_station,
+              metrics.swaps_per_station
+            );
+            return (
+              <div
+                key={station.id}
+                className="flex items-center justify-between bg-gray-50 rounded p-2 text-sm"
+              >
+                <span className="text-gray-600 truncate max-w-[80px]" title={station.id}>
+                  {station.id}
                 </span>
-                <div
-                  className={`w-3 h-3 rounded-full ${
-                    station.full_batteries > station.num_slots * 0.5
-                      ? 'bg-green-500'
-                      : station.full_batteries > station.num_slots * 0.2
-                      ? 'bg-yellow-500'
-                      : 'bg-red-500'
-                  }`}
-                />
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">
+                    {station.full_batteries}/{station.num_slots}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className={`text-xs font-medium ${getMissRateTextColor(missRate)}`}>
+                      {(missRate * 100).toFixed(0)}%
+                    </span>
+                    <div
+                      className={`w-3 h-3 rounded-full ${getMissRateColor(missRate)}`}
+                      title={`Miss rate: ${(missRate * 100).toFixed(1)}%`}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
