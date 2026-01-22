@@ -52,6 +52,8 @@ export interface Metrics {
   miss_rate: number;
   no_battery_misses: number;
   partial_charge_misses: number;
+  misses_per_station: Record<string, number>;
+  swaps_per_station: Record<string, number>;
 }
 
 export interface MetricsSummary extends Metrics {
