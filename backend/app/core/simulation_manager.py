@@ -5,9 +5,12 @@ from typing import Optional, Callable, List, Any
 from datetime import datetime
 import uuid
 
-from app.core.simulation_engine import SimulationEngine, SimulationConfig, SimulationStatus
+from app.core.simulation_engine import (
+    SimulationEngine, SimulationConfig, SimulationStatus, ScooterGroupSpec
+)
 from app.models.entities import WorldState
 from app.simulation.movement_strategies import MovementStrategyType
+from app.simulation.activity_strategies import ActivityStrategyType
 
 
 class SimulationManager:
@@ -75,25 +78,77 @@ class SimulationManager:
         except ValueError:
             movement_strategy = MovementStrategyType.RANDOM_WALK
 
+        # Parse scale config
+        scale = config_dict.get("scale", {})
+        meters_per_grid_unit = scale.get("meters_per_grid_unit", 100.0)
+        time_scale = scale.get("time_scale", 60.0)
+
+        # Parse scooter groups
+        scooter_groups = None
+        groups_data = config_dict.get("scooter_groups")
+        if groups_data:
+            scooter_groups = self._parse_scooter_groups(groups_data)
+
         config = SimulationConfig(
             grid_width=config_dict.get("grid", {}).get("width", 100),
             grid_height=config_dict.get("grid", {}).get("height", 100),
             max_duration_seconds=config_dict.get("duration_hours", 24) * 3600,
+            meters_per_grid_unit=meters_per_grid_unit,
+            time_scale=time_scale,
             num_stations=len(config_dict.get("stations") or []) or config_dict.get("num_stations", 5),
             slots_per_station=config_dict.get("slots_per_station", 10),
-            station_charge_rate_kw=config_dict.get("station_charge_rate_kw", 0.5),
+            station_charge_rate_kw=config_dict.get("station_charge_rate_kw", 1.3),
             initial_batteries_per_station=config_dict.get("initial_batteries_per_station", 8),
             num_scooters=config_dict.get("scooters", {}).get("count", 50),
-            scooter_speed=config_dict.get("scooters", {}).get("speed", 5.0),
+            scooter_speed=config_dict.get("scooters", {}).get("speed", 0.025),
             swap_threshold=config_dict.get("scooters", {}).get("swap_threshold", 0.2),
-            battery_capacity_kwh=config_dict.get("scooters", {}).get("battery_spec", {}).get("capacity_kwh", 1.5),
-            battery_max_charge_rate_kw=config_dict.get("scooters", {}).get("battery_spec", {}).get("charge_rate_kw", 0.5),
-            consumption_rate_kwh_per_unit=config_dict.get("scooters", {}).get("battery_spec", {}).get("consumption_rate", 0.001),
+            battery_capacity_kwh=config_dict.get("scooters", {}).get("battery_spec", {}).get("capacity_kwh", 1.6),
+            battery_max_charge_rate_kw=config_dict.get("scooters", {}).get("battery_spec", {}).get("charge_rate_kw", 1.3),
+            consumption_rate_kwh_per_unit=config_dict.get("scooters", {}).get("battery_spec", {}).get("consumption_rate", 0.005),
             random_seed=config_dict.get("random_seed"),
             station_positions=config_dict.get("stations"),
             movement_strategy=movement_strategy,
+            scooter_groups=scooter_groups,
         )
         self.set_config(config)
+
+    def _parse_scooter_groups(self, groups_data: list) -> List[ScooterGroupSpec]:
+        """Parse scooter groups from configuration dict."""
+        groups = []
+        for g in groups_data:
+            # Parse movement strategy if specified
+            movement_strategy = None
+            if g.get("movement_strategy"):
+                try:
+                    movement_strategy = MovementStrategyType(g["movement_strategy"])
+                except ValueError:
+                    pass
+
+            # Parse activity strategy
+            activity_strategy = None
+            activity_str = g.get("activity_strategy", "always_active")
+            try:
+                activity_strategy = ActivityStrategyType(activity_str)
+            except ValueError:
+                activity_strategy = ActivityStrategyType.ALWAYS_ACTIVE
+
+            # Get activity schedule config
+            schedule = g.get("activity_schedule", {})
+
+            groups.append(ScooterGroupSpec(
+                name=g.get("name", f"Group {len(groups) + 1}"),
+                count=g.get("count", 10),
+                color=g.get("color", "#22C55E"),
+                speed=g.get("speed"),
+                swap_threshold=g.get("swap_threshold"),
+                movement_strategy=movement_strategy,
+                activity_strategy=activity_strategy,
+                activity_start_hour=schedule.get("activity_start_hour", 8.0),
+                activity_end_hour=schedule.get("activity_end_hour", 20.0),
+                max_distance_per_day_km=schedule.get("max_distance_per_day_km"),
+                low_battery_threshold=schedule.get("low_battery_threshold", 0.3),
+            ))
+        return groups
 
     async def start(self) -> str:
         """Start the simulation. Returns session ID."""

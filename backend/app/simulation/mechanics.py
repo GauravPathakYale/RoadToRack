@@ -51,6 +51,57 @@ def schedule_move(
     return (event, world.current_time + travel_time)
 
 
+def schedule_move_with_activity_check(
+    scooter: Scooter,
+    world: "WorldState",
+    scheduler: "EventScheduler"
+) -> Tuple["Event", float]:
+    """Schedule next move with activity strategy check.
+
+    This wraps schedule_move to first check if the scooter
+    should continue being active or transition to idle.
+
+    Strategy precedence: scooter.activity_strategy > world.activity_strategy > default.
+
+    Args:
+        scooter: The scooter to schedule a move for
+        world: Current world state
+        scheduler: Event scheduler
+
+    Returns:
+        Tuple of (Event, scheduled_time) - may be move event or idle/swap-then-idle event
+    """
+    from app.simulation.events import ScooterGoIdleEvent, ScooterSwapThenIdleEvent
+    from app.simulation.activity_strategies import (
+        ActivityDecision, DEFAULT_ACTIVITY_STRATEGY
+    )
+
+    # Get activity strategy (per-scooter > world > default)
+    strategy = scooter.activity_strategy or getattr(world, 'activity_strategy', None) or DEFAULT_ACTIVITY_STRATEGY
+
+    # Check activity status
+    result = strategy.check_activity(scooter, world, scheduler)
+
+    if result.decision == ActivityDecision.GO_IDLE:
+        event = ScooterGoIdleEvent(
+            scooter_id=scooter.id,
+            wake_up_time=result.wake_up_time,
+            reason=result.reason
+        )
+        return (event, world.current_time)
+
+    elif result.decision == ActivityDecision.SWAP_THEN_IDLE:
+        event = ScooterSwapThenIdleEvent(
+            scooter_id=scooter.id,
+            wake_up_time=result.wake_up_time,
+            reason=result.reason
+        )
+        return (event, world.current_time)
+
+    # Continue active - delegate to normal move scheduling
+    return schedule_move(scooter, world, scheduler)
+
+
 def schedule_move_toward_station(
     scooter: Scooter,
     world: "WorldState",

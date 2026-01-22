@@ -28,6 +28,10 @@ class WorldState:
     grid_width: int = 100
     grid_height: int = 100
 
+    # Scale factors for time-of-day awareness
+    time_scale: float = 60.0  # Real seconds per simulation second
+    meters_per_grid_unit: float = 100.0
+
     # Metrics collector (set by SimulationEngine)
     metrics: Optional[Any] = None  # Actually MetricsCollector, using Any to avoid circular import
 
@@ -35,6 +39,9 @@ class WorldState:
     # Using Any to avoid circular import at runtime
     movement_strategy: Optional[Any] = None  # Actually MovementStrategy
     station_seeking_behavior: Optional[Any] = None  # Actually StationSeekingBehavior
+
+    # Scooter groups metadata (for frontend visualization)
+    scooter_groups: list = field(default_factory=list)  # List of {id, name, color, count}
 
     def snapshot(self) -> "WorldState":
         """Create a deep copy for visualization/logging."""
@@ -81,4 +88,5 @@ class WorldState:
                 s.to_dict(self.batteries) for s in self.stations.values()
             ],
             "batteries": [b.to_dict() for b in self.batteries.values()],
+            "scooter_groups": self.scooter_groups,
         }

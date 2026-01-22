@@ -1,8 +1,8 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useSimulationStore } from '../../stores/simulationStore';
-import type { Scooter, Station } from '../../types/simulation';
+import type { Scooter, Station, ScooterGroupInfo } from '../../types/simulation';
 
-// Battery level to color mapping
+// Battery level to color mapping (fallback when no group)
 function getBatteryColor(level: number): string {
   if (level < 0.2) return '#EF4444';  // red - critical
   if (level < 0.4) return '#F97316';  // orange - low
@@ -11,7 +11,7 @@ function getBatteryColor(level: number): string {
   return '#22C55E';                    // green - full
 }
 
-// Scooter state to color mapping
+// Scooter state to color mapping (for ring indicator)
 function getScooterStateColor(state: string): string {
   switch (state) {
     case 'TRAVELING_TO_STATION':
@@ -20,9 +20,36 @@ function getScooterStateColor(state: string): string {
       return '#8B5CF6';  // purple
     case 'WAITING_FOR_BATTERY':
       return '#EF4444';  // red
+    case 'IDLE':
+      return '#9CA3AF';  // gray - idle
     default:
       return '#22C55E';  // green - moving
   }
+}
+
+// Get scooter fill color (uses group color if available, otherwise battery color)
+function getScooterFillColor(
+  scooter: Scooter,
+  groupMap: Map<string, ScooterGroupInfo>
+): string {
+  // If scooter has a group, use group color
+  if (scooter.group_id && groupMap.has(scooter.group_id)) {
+    return groupMap.get(scooter.group_id)!.color;
+  }
+  // Otherwise use battery level color
+  return getBatteryColor(scooter.battery_level);
+}
+
+// Apply opacity for IDLE scooters
+function applyIdleOpacity(color: string, state: string): string {
+  if (state === 'IDLE') {
+    // Convert hex to rgba with 40% opacity
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, 0.4)`;
+  }
+  return color;
 }
 
 export function GridCanvas() {
@@ -34,6 +61,7 @@ export function GridCanvas() {
     gridHeight,
     scooters,
     stations,
+    scooterGroups,
   } = useSimulationStore();
 
   const draw = useCallback(() => {
@@ -43,6 +71,12 @@ export function GridCanvas() {
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // Create a map for quick group lookups
+    const groupMap = new Map<string, ScooterGroupInfo>();
+    scooterGroups.forEach(group => {
+      groupMap.set(group.id, group);
+    });
 
     // Get container dimensions
     const rect = container.getBoundingClientRect();
@@ -121,8 +155,10 @@ export function GridCanvas() {
       const y = offsetY + scooter.position.y * cellSize + cellSize / 2;
       const radius = Math.max(cellSize / 3, 4);
 
-      // Scooter circle with battery color
-      ctx.fillStyle = getBatteryColor(scooter.battery_level);
+      // Get fill color (group color or battery color)
+      const fillColor = getScooterFillColor(scooter, groupMap);
+      // Apply opacity for IDLE scooters
+      ctx.fillStyle = applyIdleOpacity(fillColor, scooter.state);
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.fill();
@@ -152,7 +188,7 @@ export function GridCanvas() {
         }
       }
     });
-  }, [gridWidth, gridHeight, scooters, stations]);
+  }, [gridWidth, gridHeight, scooters, stations, scooterGroups]);
 
   // Animation loop
   useEffect(() => {

@@ -5,13 +5,17 @@ export interface Position {
   y: number;
 }
 
+export type ScooterState = 'MOVING' | 'TRAVELING_TO_STATION' | 'SWAPPING' | 'WAITING_FOR_BATTERY' | 'IDLE';
+
 export interface Scooter {
   id: string;
   position: Position;
   battery_id: string;
   battery_level: number;
-  state: 'MOVING' | 'TRAVELING_TO_STATION' | 'SWAPPING' | 'WAITING_FOR_BATTERY';
+  state: ScooterState;
   target_station_id?: string;
+  group_id?: string;
+  distance_traveled_today?: number;
 }
 
 export interface BatterySlot {
@@ -39,6 +43,7 @@ export interface SimulationState {
   grid_height: number;
   scooters: Scooter[];
   stations: Station[];
+  scooter_groups?: ScooterGroupInfo[];  // Group metadata for visualization
 }
 
 export interface Metrics {
@@ -60,6 +65,49 @@ export interface MetricsSummary extends Metrics {
 
 // Movement strategy types
 export type MovementStrategyType = 'random_walk' | 'directed';
+
+// Activity strategy types
+export type ActivityStrategyType = 'always_active' | 'scheduled';
+
+// Activity schedule configuration
+export interface ActivityScheduleConfig {
+  activity_start_hour: number;  // 0-23.99
+  activity_end_hour: number;    // 0-23.99
+  max_distance_per_day_km?: number;  // Optional daily distance limit
+  low_battery_threshold: number;  // 0.1-0.9
+}
+
+// Scooter group configuration
+export interface ScooterGroupConfig {
+  name: string;
+  count: number;
+  color: string;  // Hex color
+  speed?: number;
+  swap_threshold?: number;
+  movement_strategy?: MovementStrategyType;
+  activity_strategy: ActivityStrategyType;
+  activity_schedule?: ActivityScheduleConfig;
+}
+
+// Scooter group info (returned from backend)
+export interface ScooterGroupInfo {
+  id: string;
+  name: string;
+  color: string;
+  count: number;
+}
+
+// Default group colors
+export const GROUP_COLORS = [
+  '#22C55E',  // Green
+  '#3B82F6',  // Blue
+  '#F97316',  // Orange
+  '#8B5CF6',  // Purple
+  '#EF4444',  // Red
+  '#EC4899',  // Pink
+  '#14B8A6',  // Teal
+  '#F59E0B',  // Amber
+];
 
 export interface SimulationConfig {
   grid: {
@@ -85,6 +133,7 @@ export interface SimulationConfig {
       consumption_rate: number; // kWh per grid unit
     };
   };
+  scooter_groups?: ScooterGroupConfig[];  // Optional scooter groups (overrides scooters.count if provided)
   duration_hours: number;
   random_seed?: number;
   movement_strategy: MovementStrategyType;

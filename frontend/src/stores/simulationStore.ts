@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Scooter, Station, SimulationStatus, Metrics } from '../types/simulation';
+import type { Scooter, Station, SimulationStatus, Metrics, ScooterGroupInfo } from '../types/simulation';
 
 interface SimulationState {
   // Connection status
@@ -16,6 +16,7 @@ interface SimulationState {
   gridHeight: number;
   scooters: Scooter[];
   stations: Station[];
+  scooterGroups: ScooterGroupInfo[];
 
   // Metrics
   metrics: Metrics;
@@ -48,6 +49,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   gridHeight: 100,
   scooters: [],
   stations: [],
+  scooterGroups: [],
   metrics: initialMetrics,
 
   // Actions
@@ -67,6 +69,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
     gridHeight: data.grid_height ?? 100,
     scooters: data.scooters ?? [],
     stations: data.stations ?? [],
+    scooterGroups: data.scooter_groups ?? [],
     metrics: data.metrics ?? initialMetrics,
   }),
 
@@ -76,6 +79,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
     tick: 0,
     scooters: [],
     stations: [],
+    scooterGroups: [],
     metrics: initialMetrics,
   }),
 }));

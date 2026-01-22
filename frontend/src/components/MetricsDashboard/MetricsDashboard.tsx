@@ -1,12 +1,4 @@
 import { useSimulationStore } from '../../stores/simulationStore';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
 
 function formatTime(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
@@ -24,6 +16,7 @@ export function MetricsDashboard() {
     s.state === 'SWAPPING' || s.state === 'WAITING_FOR_BATTERY'
   ).length;
   const scootersTraveling = scooters.filter(s => s.state === 'TRAVELING_TO_STATION').length;
+  const scootersIdle = scooters.filter(s => s.state === 'IDLE').length;
 
   const totalSlots = stations.reduce((sum, s) => sum + s.num_slots, 0);
   const totalFullBatteries = stations.reduce((sum, s) => sum + s.full_batteries, 0);
@@ -85,7 +78,7 @@ export function MetricsDashboard() {
       {/* Scooter status */}
       <div className="mb-6">
         <h3 className="text-sm font-medium text-gray-700 mb-2">Scooter Status</h3>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           <div className="text-center p-2 bg-green-50 rounded">
             <div className="text-xs text-green-600">Moving</div>
             <div className="font-semibold text-green-700">{scootersMoving}</div>
@@ -97,6 +90,10 @@ export function MetricsDashboard() {
           <div className="text-center p-2 bg-purple-50 rounded">
             <div className="text-xs text-purple-600">At Station</div>
             <div className="font-semibold text-purple-700">{scootersAtStation}</div>
+          </div>
+          <div className="text-center p-2 bg-slate-100 rounded">
+            <div className="text-xs text-slate-600">Idle</div>
+            <div className="font-semibold text-slate-700">{scootersIdle}</div>
           </div>
           <div className="text-center p-2 bg-gray-50 rounded">
             <div className="text-xs text-gray-600">Total</div>

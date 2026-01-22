@@ -8,6 +8,7 @@ import {
   calculateRealWorldChargeTime,
   MovementStrategyType,
 } from '../../types/simulation';
+import { ScooterGroupEditor } from './ScooterGroupEditor';
 
 export function ConfigurationPanel() {
   const {
@@ -215,7 +216,7 @@ export function ConfigurationPanel() {
                   max="10"
                   step="0.1"
                   value={config.station_charge_rate_kw}
-                  onChange={(e) => updateConfig({ station_charge_rate_kw: parseFloat(e.target.value) || 0.5 })}
+                  onChange={(e) => updateConfig({ station_charge_rate_kw: parseFloat(e.target.value) || 1.3 })}
                   disabled={isRunning}
                   className="w-full px-3 py-2 border rounded-lg text-sm
                              disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -263,11 +264,11 @@ export function ConfigurationPanel() {
                 <label className="block text-xs text-gray-500 mb-1">Speed (units/sim-sec)</label>
                 <input
                   type="number"
-                  min="0.1"
+                  min="0.001"
                   max="50"
-                  step="0.5"
+                  step="0.001"
                   value={config.scooters.speed}
-                  onChange={(e) => updateScooterConfig({ speed: parseFloat(e.target.value) || 5 })}
+                  onChange={(e) => updateScooterConfig({ speed: parseFloat(e.target.value) || 0.025 })}
                   disabled={isRunning}
                   className="w-full px-3 py-2 border rounded-lg text-sm
                              disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -292,6 +293,16 @@ export function ConfigurationPanel() {
         )}
       </div>
 
+      {/* Scooter Groups */}
+      <div className="mb-4 border-b pb-4">
+        <SectionHeader title="Scooter Groups" section="groups" />
+        {expandedSection === 'groups' && (
+          <div className="mt-2">
+            <ScooterGroupEditor disabled={isRunning} />
+          </div>
+        )}
+      </div>
+
       {/* Battery Settings - NEW */}
       <div className="mb-4 border-b pb-4">
         <SectionHeader title="Battery" section="battery" />
@@ -306,7 +317,7 @@ export function ConfigurationPanel() {
                   max="10"
                   step="0.1"
                   value={config.scooters.battery_spec.capacity_kwh}
-                  onChange={(e) => updateBatterySpec({ capacity_kwh: parseFloat(e.target.value) || 1.5 })}
+                  onChange={(e) => updateBatterySpec({ capacity_kwh: parseFloat(e.target.value) || 1.6 })}
                   disabled={isRunning}
                   className="w-full px-3 py-2 border rounded-lg text-sm
                              disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -320,7 +331,7 @@ export function ConfigurationPanel() {
                   max="0.1"
                   step="0.0001"
                   value={config.scooters.battery_spec.consumption_rate}
-                  onChange={(e) => updateBatterySpec({ consumption_rate: parseFloat(e.target.value) || 0.001 })}
+                  onChange={(e) => updateBatterySpec({ consumption_rate: parseFloat(e.target.value) || 0.005 })}
                   disabled={isRunning}
                   className="w-full px-3 py-2 border rounded-lg text-sm
                              disabled:bg-gray-100 disabled:cursor-not-allowed"

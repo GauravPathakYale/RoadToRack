@@ -21,6 +21,15 @@ from app.simulation.movement_strategies import (
     GreedyStationSeekingBehavior,
     create_movement_strategy,
 )
+from app.simulation.activity_strategies import (
+    ActivityStrategy,
+    ActivityStrategyType,
+    AlwaysActiveStrategy,
+    ScheduledActivityStrategy,
+    create_activity_strategy,
+    DEFAULT_ACTIVITY_STRATEGY,
+)
+from app.simulation.time_utils import get_next_midnight, simulation_time_from_hour
 
 
 class SimulationStatus(Enum):
@@ -33,6 +42,23 @@ class SimulationStatus(Enum):
 
 
 @dataclass
+class ScooterGroupSpec:
+    """Specification for a group of scooters with shared parameters."""
+    name: str
+    count: int
+    color: str = "#22C55E"
+    speed: Optional[float] = None
+    swap_threshold: Optional[float] = None
+    movement_strategy: Optional[Union[MovementStrategyType, MovementStrategy]] = None
+    activity_strategy: Optional[Union[ActivityStrategyType, ActivityStrategy]] = None
+    # Activity schedule parameters (used when activity_strategy is SCHEDULED)
+    activity_start_hour: float = 8.0
+    activity_end_hour: float = 20.0
+    max_distance_per_day_km: Optional[float] = None
+    low_battery_threshold: float = 0.3
+
+
+@dataclass
 class SimulationConfig:
     """Configuration for the simulation."""
     # Grid dimensions
@@ -42,21 +68,25 @@ class SimulationConfig:
     # Time configuration
     max_duration_seconds: float = 86400.0  # 24 hours
 
+    # Scale configuration for time-of-day awareness
+    meters_per_grid_unit: float = 100.0
+    time_scale: float = 60.0  # Real seconds per simulation second
+
     # Station configuration
     num_stations: int = 5
     slots_per_station: int = 10
-    station_charge_rate_kw: float = 0.5
+    station_charge_rate_kw: float = 1.3
     initial_batteries_per_station: int = 8
 
     # Scooter configuration
     num_scooters: int = 50
-    scooter_speed: float = 5.0  # grid units per second
+    scooter_speed: float = 0.025  # grid units per second (9 km/h with default scale)
     swap_threshold: float = 0.2  # 20% triggers swap
 
     # Battery configuration
-    battery_capacity_kwh: float = 1.5
-    battery_max_charge_rate_kw: float = 0.5
-    consumption_rate_kwh_per_unit: float = 0.001  # kWh per grid unit
+    battery_capacity_kwh: float = 1.6
+    battery_max_charge_rate_kw: float = 1.3
+    consumption_rate_kwh_per_unit: float = 0.005  # kWh per grid unit
 
     # Random seed for reproducibility
     random_seed: Optional[int] = None
@@ -70,6 +100,9 @@ class SimulationConfig:
 
     # Station seeking behavior (if None, uses default greedy behavior)
     station_seeking_behavior: Optional[StationSeekingBehavior] = None
+
+    # Scooter groups (if provided, overrides num_scooters)
+    scooter_groups: Optional[List[ScooterGroupSpec]] = None
 
 
 @dataclass
@@ -109,6 +142,10 @@ class SimulationEngine:
             movement_strategy=movement_strategy,
             station_seeking_behavior=station_seeking,
         )
+        # Store time_scale on world for events to access
+        self.world.time_scale = config.time_scale
+        self.world.meters_per_grid_unit = config.meters_per_grid_unit
+
         self.scheduler = EventScheduler(
             max_time=config.max_duration_seconds,
             random_seed=config.random_seed
@@ -135,6 +172,36 @@ class SimulationEngine:
                 return create_movement_strategy(strategy_type)
             except ValueError:
                 raise ValueError(f"Unknown movement strategy: {strategy}")
+
+    def _resolve_activity_strategy(
+        self,
+        group: ScooterGroupSpec
+    ) -> Optional[ActivityStrategy]:
+        """Resolve activity strategy for a scooter group."""
+        strategy = group.activity_strategy
+
+        if strategy is None:
+            return None  # Use default (AlwaysActiveStrategy)
+        elif isinstance(strategy, ActivityStrategy):
+            return strategy
+        elif strategy == ActivityStrategyType.ALWAYS_ACTIVE:
+            return AlwaysActiveStrategy()
+        elif strategy == ActivityStrategyType.SCHEDULED:
+            return ScheduledActivityStrategy(
+                activity_start_hour=group.activity_start_hour,
+                activity_end_hour=group.activity_end_hour,
+                max_distance_per_day_km=group.max_distance_per_day_km,
+                low_battery_threshold=group.low_battery_threshold,
+                meters_per_grid_unit=self.config.meters_per_grid_unit,
+                time_scale=self.config.time_scale
+            )
+        else:
+            # Try to parse as string
+            try:
+                strategy_type = ActivityStrategyType(strategy)
+                return create_activity_strategy(strategy_type)
+            except ValueError:
+                raise ValueError(f"Unknown activity strategy: {strategy}")
 
     def initialize(self) -> None:
         """Set up initial world state and events."""
@@ -186,6 +253,12 @@ class SimulationEngine:
 
         return positions
 
+    def _get_total_scooters(self) -> int:
+        """Get total number of scooters from config or groups."""
+        if self.config.scooter_groups:
+            return sum(g.count for g in self.config.scooter_groups)
+        return self.config.num_scooters
+
     def _initialize_batteries(self) -> None:
         """Create batteries and place them in stations."""
         battery_id = 0
@@ -207,7 +280,8 @@ class SimulationEngine:
                 battery_id += 1
 
         # Create batteries for scooters
-        for i in range(self.config.num_scooters):
+        num_scooters = self._get_total_scooters()
+        for i in range(num_scooters):
             battery = Battery(
                 id=f"battery_{battery_id}",
                 capacity_kwh=self.config.battery_capacity_kwh,
@@ -220,10 +294,18 @@ class SimulationEngine:
             battery_id += 1
 
     def _initialize_scooters(self) -> None:
-        """Create scooters at random positions."""
+        """Create scooters at random positions, optionally from groups."""
         rng = self.scheduler.get_rng()
-        battery_idx = len(self.world.batteries) - self.config.num_scooters
+        num_scooters = self._get_total_scooters()
+        battery_idx = len(self.world.batteries) - num_scooters
 
+        if self.config.scooter_groups:
+            self._initialize_scooters_from_groups(rng, battery_idx)
+        else:
+            self._initialize_scooters_default(rng, battery_idx)
+
+    def _initialize_scooters_default(self, rng, battery_idx: int) -> None:
+        """Create scooters with default configuration."""
         for i in range(self.config.num_scooters):
             # Random starting position
             x = rng.integers(0, self.config.grid_width)
@@ -240,21 +322,78 @@ class SimulationEngine:
             )
             self.world.scooters[scooter.id] = scooter
 
+    def _initialize_scooters_from_groups(self, rng, battery_idx: int) -> None:
+        """Create scooters from group configurations."""
+        scooter_idx = 0
+
+        for group_idx, group in enumerate(self.config.scooter_groups):
+            # Resolve strategies for this group
+            movement_strategy = None
+            if group.movement_strategy is not None:
+                movement_strategy = self._resolve_movement_strategy(group.movement_strategy)
+
+            activity_strategy = self._resolve_activity_strategy(group)
+
+            # Use group overrides or fall back to defaults
+            speed = group.speed if group.speed is not None else self.config.scooter_speed
+            swap_threshold = group.swap_threshold if group.swap_threshold is not None else self.config.swap_threshold
+
+            for i in range(group.count):
+                # Random starting position
+                x = rng.integers(0, self.config.grid_width)
+                y = rng.integers(0, self.config.grid_height)
+
+                scooter = Scooter(
+                    id=f"scooter_{scooter_idx}",
+                    position=Position(x, y),
+                    battery_id=f"battery_{battery_idx + scooter_idx}",
+                    state=ScooterState.MOVING,
+                    speed=speed,
+                    consumption_rate=self.config.consumption_rate_kwh_per_unit,
+                    swap_threshold=swap_threshold,
+                    group_id=f"group_{group_idx}",
+                    movement_strategy=movement_strategy,
+                    activity_strategy=activity_strategy,
+                )
+                self.world.scooters[scooter.id] = scooter
+                scooter_idx += 1
+
+        # Store group metadata on world for frontend reference
+        self.world.scooter_groups = [
+            {
+                "id": f"group_{i}",
+                "name": g.name,
+                "color": g.color,
+                "count": g.count,
+            }
+            for i, g in enumerate(self.config.scooter_groups)
+        ]
+
     def _schedule_initial_events(self) -> None:
         """Schedule initial events to start the simulation."""
+        from app.simulation.events import DailyResetEvent
+        from app.simulation.mechanics import schedule_move_with_activity_check
+
         # Schedule initial moves for all scooters using pluggable movement strategy
         for scooter in self.world.scooters.values():
             # Notify strategy that scooter is starting (per-scooter takes precedence)
             strategy = scooter.movement_strategy or self.world.movement_strategy
             if strategy:
                 strategy.on_scooter_activated(scooter, self.world, self.scheduler)
-            event, time = schedule_move(scooter, self.world, self.scheduler)
+
+            # Use activity check to determine if scooter should start active or idle
+            event, time = schedule_move_with_activity_check(scooter, self.world, self.scheduler)
             self.scheduler.schedule(event, time)
 
         # Schedule charging ticks for all stations
         for station in self.world.stations.values():
             event = BatteryChargingTickEvent(station_id=station.id)
             self.scheduler.schedule(event, 60.0)  # First tick at 60 seconds
+
+        # Schedule first daily reset at midnight (if simulation lasts long enough)
+        first_midnight = get_next_midnight(0.0, self.config.time_scale)
+        if first_midnight < self.config.max_duration_seconds:
+            self.scheduler.schedule(DailyResetEvent(day_number=1), first_midnight)
 
     def step(self) -> bool:
         """
@@ -385,6 +524,10 @@ class SimulationEngine:
             movement_strategy=movement_strategy,
             station_seeking_behavior=station_seeking,
         )
+        # Store time_scale on world for events to access
+        self.world.time_scale = self.config.time_scale
+        self.world.meters_per_grid_unit = self.config.meters_per_grid_unit
+
         self.scheduler = EventScheduler(
             max_time=self.config.max_duration_seconds,
             random_seed=self.config.random_seed
