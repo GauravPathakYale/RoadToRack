@@ -1,8 +1,17 @@
 """Pydantic schemas for metrics API."""
 
-from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Tuple
-from datetime import datetime
+from pydantic import BaseModel
+from typing import List, Dict, Tuple
+
+
+class SwapEventRecord(BaseModel):
+    """Record of a swap event."""
+    timestamp: float
+    scooter_id: str
+    station_id: str
+    old_battery_level: float
+    new_battery_level: float
+    was_partial: bool
 
 
 class CurrentMetrics(BaseModel):
@@ -14,6 +23,17 @@ class CurrentMetrics(BaseModel):
     partial_charge_misses: int
     misses_per_station: Dict[str, int] = {}
     swaps_per_station: Dict[str, int] = {}
+
+
+class StationSwapEvents(BaseModel):
+    """Swap events for a single station."""
+    station_id: str
+    total: int
+    offset: int
+    limit: int
+    sort_by: str
+    order: str
+    swaps: List[SwapEventRecord] = []
 
 
 class MetricsSummary(BaseModel):

@@ -296,6 +296,27 @@ class SimulationManager:
             return self._engine.metrics.compile()
         return None
 
+    def get_station_swaps(
+        self,
+        station_id: str,
+        limit: int = 100,
+        offset: int = 0,
+        sort_by: str = "battery",
+        order: str = "asc",
+        since: Optional[float] = None,
+    ) -> Optional[dict]:
+        """Get swap events for a specific station."""
+        if self._engine:
+            return self._engine.metrics.get_station_swaps(
+                station_id=station_id,
+                limit=limit,
+                offset=offset,
+                sort_by=sort_by,
+                order=order,
+                since=since,
+            )
+        return None
+
     def add_observer(self, observer: Callable[[dict], Any]) -> None:
         """Register an observer for state updates."""
         self._observers.append(observer)

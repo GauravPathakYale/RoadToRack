@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, type MouseEvent } from 'react';
 import { useSimulationStore } from '../../stores/simulationStore';
 import type { Scooter, Station, ScooterGroupInfo } from '../../types/simulation';
 
@@ -55,6 +55,7 @@ function applyIdleOpacity(color: string, state: string): string {
 export function GridCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const stationHitboxesRef = useRef<Array<{ id: string; x: number; y: number; size: number }>>([]);
 
   const {
     gridWidth,
@@ -62,6 +63,7 @@ export function GridCanvas() {
     scooters,
     stations,
     scooterGroups,
+    setSelectedStationId,
   } = useSimulationStore();
 
   const draw = useCallback(() => {
@@ -117,6 +119,7 @@ export function GridCanvas() {
     }
 
     // Draw stations
+    const stationHitboxes: Array<{ id: string; x: number; y: number; size: number }> = [];
     stations.forEach((station: Station) => {
       const x = offsetX + station.position.x * cellSize;
       const y = offsetY + station.position.y * cellSize;
@@ -147,7 +150,10 @@ export function GridCanvas() {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(`${station.full_batteries}/${station.num_slots}`, x, y);
+
+      stationHitboxes.push({ id: station.id, x, y, size });
     });
+    stationHitboxesRef.current = stationHitboxes;
 
     // Draw scooters
     scooters.forEach((scooter: Scooter) => {
@@ -190,6 +196,29 @@ export function GridCanvas() {
     });
   }, [gridWidth, gridHeight, scooters, stations, scooterGroups]);
 
+  const handleCanvasClick = useCallback((event: MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+
+    const hitbox = stationHitboxesRef.current.find((station) => {
+      const half = station.size / 2;
+      return (
+        clickX >= station.x - half &&
+        clickX <= station.x + half &&
+        clickY >= station.y - half &&
+        clickY <= station.y + half
+      );
+    });
+
+    if (hitbox) {
+      setSelectedStationId(hitbox.id);
+    }
+  }, [setSelectedStationId]);
+
   // Animation loop
   useEffect(() => {
     let animationFrameId: number;
@@ -223,7 +252,8 @@ export function GridCanvas() {
     <div ref={containerRef} className="w-full h-full min-h-[400px]">
       <canvas
         ref={canvasRef}
-        className="w-full h-full"
+        className="w-full h-full cursor-pointer"
+        onClick={handleCanvasClick}
       />
     </div>
   );

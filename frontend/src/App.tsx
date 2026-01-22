@@ -2,6 +2,7 @@ import { GridCanvas } from './components/GridVisualization/GridCanvas';
 import { SimulationControls } from './components/SimulationControls/SimulationControls';
 import { ConfigurationPanel } from './components/ConfigurationPanel/ConfigurationPanel';
 import { MetricsDashboard } from './components/MetricsDashboard/MetricsDashboard';
+import { StationAnalyticsWindow } from './components/StationAnalyticsWindow/StationAnalyticsWindow';
 import { useSimulationSocket } from './hooks/useSimulationSocket';
 
 function App() {
@@ -73,6 +74,8 @@ function App() {
           Battery Swap Station Simulation System
         </div>
       </footer>
+
+      <StationAnalyticsWindow />
     </div>
   );
 }

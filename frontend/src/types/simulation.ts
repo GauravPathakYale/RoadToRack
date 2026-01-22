@@ -56,6 +56,15 @@ export interface Metrics {
   swaps_per_station: Record<string, number>;
 }
 
+export interface SwapEventRecord {
+  timestamp: number;
+  scooter_id: string;
+  station_id: string;
+  old_battery_level: number;
+  new_battery_level: number;
+  was_partial: boolean;
+}
+
 export interface MetricsSummary extends Metrics {
   no_battery_miss_rate: number;
   partial_charge_miss_rate: number;
@@ -63,6 +72,16 @@ export interface MetricsSummary extends Metrics {
   max_wait_time: number;
   swaps_per_station: Record<string, number>;
   miss_rate_history: [number, number][];
+}
+
+export interface StationSwapEvents {
+  station_id: string;
+  total: number;
+  offset: number;
+  limit: number;
+  sort_by: 'battery' | 'time';
+  order: 'asc' | 'desc';
+  swaps: SwapEventRecord[];
 }
 
 // Movement strategy types
