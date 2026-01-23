@@ -21,10 +21,14 @@ interface SimulationState {
   // Metrics
   metrics: Metrics;
 
+  // UI state
+  selectedStationId: string | null;
+
   // Actions
   setConnected: (connected: boolean) => void;
   setStatus: (status: SimulationStatus) => void;
   setSpeed: (speed: number) => void;
+  setSelectedStationId: (stationId: string | null) => void;
   updateState: (state: Partial<SimulationState>) => void;
   updateFromServer: (data: any) => void;
   reset: () => void;
@@ -53,6 +57,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   stations: [],
   scooterGroups: [],
   metrics: initialMetrics,
+  selectedStationId: null,
 
   // Actions
   setConnected: (connected) => set({ isConnected: connected }),
@@ -60,6 +65,8 @@ export const useSimulationStore = create<SimulationState>((set) => ({
   setStatus: (status) => set({ status }),
 
   setSpeed: (speed) => set({ speed }),
+
+  setSelectedStationId: (stationId) => set({ selectedStationId: stationId }),
 
   updateState: (state) => set((prev) => ({ ...prev, ...state })),
 
@@ -72,7 +79,7 @@ export const useSimulationStore = create<SimulationState>((set) => ({
     scooters: data.scooters ?? [],
     stations: data.stations ?? [],
     scooterGroups: data.scooter_groups ?? [],
-    metrics: data.metrics ?? initialMetrics,
+    metrics: { ...initialMetrics, ...(data.metrics ?? {}) },
   }),
 
   reset: () => set({
@@ -83,5 +90,6 @@ export const useSimulationStore = create<SimulationState>((set) => ({
     stations: [],
     scooterGroups: [],
     metrics: initialMetrics,
+    selectedStationId: null,
   }),
 }));

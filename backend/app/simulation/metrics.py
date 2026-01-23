@@ -39,6 +39,7 @@ class MetricsCollector:
 
     # Swap tracking
     swap_events: List[SwapEvent] = field(default_factory=list)
+    swap_events_by_station: Dict[str, List[SwapEvent]] = field(default_factory=dict)
     swaps_per_station: Dict[str, int] = field(default_factory=dict)
 
     # Per-station miss tracking
@@ -101,14 +102,17 @@ class MetricsCollector:
         """Record a completed swap."""
         was_partial = new_battery_level < 0.9999  # Not fully charged
 
-        self.swap_events.append(SwapEvent(
+        event = SwapEvent(
             timestamp=time,
             scooter_id=scooter_id,
             station_id=station_id,
             old_battery_level=old_battery_level,
             new_battery_level=new_battery_level,
             was_partial=was_partial
-        ))
+        )
+
+        self.swap_events.append(event)
+        self.swap_events_by_station.setdefault(station_id, []).append(event)
 
         self.swaps_per_station[station_id] = \
             self.swaps_per_station.get(station_id, 0) + 1
@@ -190,6 +194,54 @@ class MetricsCollector:
             "partial_charge_misses_per_station": dict(self.partial_charge_misses_per_station),
         }
 
+    def get_station_swaps(
+        self,
+        station_id: str,
+        limit: int = 100,
+        offset: int = 0,
+        sort_by: str = "battery",
+        order: str = "asc",
+        since: Optional[float] = None,
+    ) -> dict:
+        """Get swap events for a specific station."""
+        events = list(self.swap_events_by_station.get(station_id, []))
+
+        if since is not None:
+            events = [event for event in events if event.timestamp >= since]
+
+        if sort_by == "time":
+            key_fn = lambda event: (event.timestamp, event.new_battery_level)
+        else:
+            key_fn = lambda event: (event.new_battery_level, event.timestamp)
+
+        reverse = order == "desc"
+        events.sort(key=key_fn, reverse=reverse)
+
+        total = len(events)
+        start = min(offset, total)
+        end = min(start + limit, total)
+        page = events[start:end]
+
+        return {
+            "station_id": station_id,
+            "total": total,
+            "offset": offset,
+            "limit": limit,
+            "sort_by": sort_by,
+            "order": order,
+            "swaps": [
+                {
+                    "timestamp": float(event.timestamp),
+                    "scooter_id": event.scooter_id,
+                    "station_id": event.station_id,
+                    "old_battery_level": float(event.old_battery_level),
+                    "new_battery_level": float(event.new_battery_level),
+                    "was_partial": bool(event.was_partial),
+                }
+                for event in page
+            ],
+        }
+
     def get_current_metrics(self) -> dict:
         """Get current metrics for real-time display."""
         return {
@@ -206,6 +258,7 @@ class MetricsCollector:
         """Reset all metrics."""
         self.miss_events.clear()
         self.swap_events.clear()
+        self.swap_events_by_station.clear()
         self.swaps_per_station.clear()
         self.misses_per_station.clear()
         self.no_battery_misses_per_station.clear()

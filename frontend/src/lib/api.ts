@@ -1,5 +1,7 @@
 // API client for REST endpoints
 
+import type { StationSwapEvents } from '../types/simulation';
+
 const API_BASE = '/api/v1';
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
@@ -62,4 +64,25 @@ export const metricsApi = {
   getCurrent: () => fetchJson<any>('/metrics/current'),
 
   getSummary: () => fetchJson<any>('/metrics/summary'),
+
+  getStationSwaps: (
+    stationId: string,
+    params?: {
+      limit?: number;
+      offset?: number;
+      sort_by?: 'battery' | 'time';
+      order?: 'asc' | 'desc';
+      since?: number;
+    }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
+    if (params?.sort_by) searchParams.set('sort_by', params.sort_by);
+    if (params?.order) searchParams.set('order', params.order);
+    if (params?.since !== undefined) searchParams.set('since', String(params.since));
+    const query = searchParams.toString();
+    const suffix = query ? `?${query}` : '';
+    return fetchJson<StationSwapEvents>(`/metrics/stations/${encodeURIComponent(stationId)}/swaps${suffix}`);
+  },
 };
